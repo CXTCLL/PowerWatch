@@ -173,13 +173,13 @@ batt_mv 稳，只有 ac 翻转   → 检测回路误判（ACDET 分压、充电 
 
 ## 安装
 
-下载 `PowerWatch-Setup.exe` 双击安装即可，**不需要管理员权限**。
+到 [**Releases**](../../releases/latest) 下载 `PowerWatch-Setup.exe`，双击安装，**不需要管理员权限**。
 
 安装到 `%LOCALAPPDATA%\Programs\PowerWatch`，会创建开始菜单快捷方式、注册开机自启、并在「应用和功能」里登记卸载入口。
 
 卸载：安装目录里的 `Uninstall.exe`，或「应用和功能」里搜索 PowerWatch。
 
-> 仓库只包含源码，安装包需要自行构建（见下）。
+> 仓库只保留源码，二进制安装包统一放在 Releases 里，避免两份版本对不上。
 
 ---
 

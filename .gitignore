@@ -4,6 +4,9 @@ obj/
 build/
 dist/
 
+# 二进制安装包只放 Releases，不进仓库
+PowerWatch-Setup.exe
+
 # IDE
 .vs/
 *.user
