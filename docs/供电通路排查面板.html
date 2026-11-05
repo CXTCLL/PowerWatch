@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Y9000P 2022 板内供电通路排查（DC 座之后）</title>
+<style>
+:root{
+  --bg:#F6F6F4; --card:#FFFFFF; --line:#E4E3DE; --line2:#D2D1CA;
+  --ink:#1E1E1C; --ink2:#43433F; --mut:#6E6E68;
+  --acc:#185FA5; --acc-bg:#EAF2FA;
+  --warn:#B45309; --warn-bg:#FBF2E4;
+  --bad:#B3261E; --bad-bg:#FBEDEB;
+  --ok:#2E6B33; --ok-bg:#EDF5ED;
+  --mono:"Cascadia Mono","Consolas","SFMono-Regular",monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);
+  font-family:"Microsoft YaHei","PingFang SC","Segoe UI",system-ui,sans-serif;
+  font-size:14px;line-height:1.65;padding:32px 20px 80px}
+.wrap{max-width:940px;margin:0 auto}
+
+header.top{margin-bottom:24px}
+.eyebrow{font-size:12px;letter-spacing:.08em;color:var(--mut);text-transform:uppercase;margin-bottom:8px}
+h1{font-size:26px;font-weight:600;letter-spacing:-.01em;line-height:1.3}
+.sub{color:var(--mut);margin-top:10px;font-size:13.5px}
+
+.scope{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0 26px}
+.chip{font-size:12.5px;border-radius:7px;padding:6px 11px;border:1px solid var(--line);background:var(--card);color:var(--ink2)}
+.chip.out{color:#8A8A84;text-decoration:line-through;text-decoration-color:#C9C8C1;background:#F1F0EC}
+.chip.in{border-color:#BBD5EC;background:var(--acc-bg);color:#12456F;font-weight:500}
+
+.pbar{position:sticky;top:0;z-index:20;background:rgba(246,246,244,.94);backdrop-filter:blur(6px);
+  border-bottom:1px solid var(--line);padding:10px 0;margin-bottom:22px;display:flex;align-items:center;gap:14px}
+.track{flex:1;height:6px;background:#E7E6E0;border-radius:99px;overflow:hidden}
+.fill{height:100%;width:0;background:var(--acc);border-radius:99px;transition:width .25s ease}
+.pnum{font-size:12.5px;color:var(--mut);font-variant-numeric:tabular-nums;white-space:nowrap}
+.btn{border:1px solid var(--line2);background:#fff;color:var(--ink2);border-radius:8px;
+  padding:6px 12px;font-size:12.5px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{background:#F4F4F1;border-color:#BFBEB6}
+.btn:active{transform:translateY(1px)}
+
+section.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 24px;margin-bottom:16px}
+.sechead{display:flex;gap:12px;align-items:flex-start;margin-bottom:6px}
+.num{flex:none;width:26px;height:26px;border-radius:7px;background:var(--acc-bg);color:var(--acc);
+  font-size:12.5px;font-weight:600;display:flex;align-items:center;justify-content:center;margin-top:2px}
+h2{font-size:17px;font-weight:600;letter-spacing:-.005em}
+.desc{color:var(--mut);font-size:13px;margin:0 0 16px 38px}
+
+.item{border-top:1px solid var(--line);padding:14px 0 4px 38px}
+.item:first-of-type{border-top:none;padding-top:6px}
+.row{display:flex;gap:10px;align-items:flex-start;cursor:pointer;user-select:none}
+.row input{appearance:none;flex:none;width:16px;height:16px;border:1.5px solid #BFBEB6;border-radius:4px;
+  margin-top:3px;cursor:pointer;position:relative;transition:.15s}
+.row input:checked{background:var(--acc);border-color:var(--acc)}
+.row input:checked::after{content:"";position:absolute;left:4.5px;top:1px;width:4px;height:8px;
+  border:solid #fff;border-width:0 1.8px 1.8px 0;transform:rotate(42deg)}
+.row .t{font-size:14px;font-weight:500;color:var(--ink)}
+.row .tag{font-size:11px;color:var(--mut);border:1px solid var(--line);border-radius:5px;
+  padding:0 6px;margin-left:8px;vertical-align:1px}
+.done .t{color:var(--mut);text-decoration:line-through;text-decoration-color:#C9C8C1}
+
+.body{margin:10px 0 0 26px}
+.body p{font-size:13px;color:var(--ink2);margin-bottom:8px}
+.body p b{font-weight:600;color:var(--ink)}
+code{font-family:var(--mono);font-size:12.4px;background:#F0EFEA;color:#3A3A36;
+  border-radius:4px;padding:1px 5px;border:1px solid #E4E3DE}
+.spec{display:grid;grid-template-columns:76px 1fr;gap:6px 10px;font-size:12.8px;margin:9px 0;
+  background:#FAFAF8;border:1px solid var(--line);border-radius:9px;padding:11px 13px}
+.spec dt{color:var(--mut);font-size:12px}
+.spec dd{color:var(--ink2)}
+.spec dd b{color:var(--ink);font-weight:600}
+
+pre{position:relative;background:#1F2429;color:#DDE3E8;border-radius:9px;padding:13px 15px;
+  font-family:var(--mono);font-size:12.3px;line-height:1.7;overflow-x:auto;margin:9px 0}
+pre .c{color:#7C8B99}
+.copy{position:absolute;top:8px;right:8px;background:#333B42;color:#C8D2DA;border:none;
+  border-radius:6px;padding:4px 10px;font-size:11.5px;cursor:pointer;font-family:inherit}
+.copy:hover{background:#414B53}
+
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{text-align:left;font-weight:500;color:var(--mut);font-size:12px;padding:8px 10px;
+  border-bottom:1px solid var(--line2);white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top;color:var(--ink2)}
+tr:last-child td{border-bottom:none}
+td b{color:var(--ink);font-weight:500}
+td .w{color:var(--warn);font-weight:500}
+
+.note{border-left:2px solid var(--warn);background:var(--warn-bg);border-radius:0 8px 8px 0;
+  padding:11px 14px;font-size:12.8px;color:#6B4415;margin:12px 0 4px}
+.note.blue{border-color:var(--acc);background:var(--acc-bg);color:#12456F}
+.note.red{border-color:var(--bad);background:var(--bad-bg);color:#7A1D18}
+.note.green{border-color:var(--ok);background:var(--ok-bg);color:#244F28}
+.note b{font-weight:600}
+
+.logbar{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
+input[type=text]{border:1px solid var(--line2);border-radius:7px;padding:7px 9px;font-size:12.8px;
+  font-family:inherit;color:var(--ink);background:#fff;outline:none}
+input[type=text]:focus{border-color:var(--acc)}
+select{border:1px solid var(--line2);border-radius:7px;padding:7px 9px;font-size:12.8px;
+  font-family:inherit;color:var(--ink);background:#fff;outline:none}
+#logtable input,#logtable select{width:100%;border-color:transparent;background:transparent;padding:4px 4px}
+#logtable input:focus,#logtable select:focus{border-color:var(--acc);background:#fff}
+.del{color:var(--mut);cursor:pointer;font-size:16px;line-height:1;background:none;border:none;padding:2px 6px}
+.del:hover{color:var(--bad)}
+
+svg.diagram{width:100%;height:auto;display:block;margin:6px 0 12px}
+footer{color:var(--mut);font-size:12px;text-align:center;margin-top:34px;line-height:1.8}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+
+@media print{
+  body{background:#fff;padding:0;font-size:12px}
+  .pbar,.logbar,.copy,.btn,.del{display:none!important}
+  section.card{break-inside:avoid;border:1px solid #ddd}
+  pre{background:#F4F4F1;color:#222;border:1px solid #ddd}
+  pre .c{color:#777}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h3 class="sr">联想拯救者 Y9000P 2022 插电瞬断的板内供电路径排查方案</h3>
+
+<header class="top">
+  <div class="eyebrow">Board-level troubleshooting · v2</div>
+  <h1>板内供电路径排查：DC 座之后</h1>
+  <p class="sub">排查范围收窄到机身内部。从 DC 座焊点开始，沿输入保险、滤波、背靠背 MOS、充电 IC 的 ACOK 检测回路，一直到系统主轨与电池，逐节点用压差法定位断点。</p>
+</header>
+
+<div class="scope">
+  <span class="chip out">电源适配器</span>
+  <span class="chip out">墙插 / 排插</span>
+  <span class="chip out">线缆与插头</span>
+  <span class="chip out">连接器中心针</span>
+  <span class="chip in">DC 座焊点</span>
+  <span class="chip in">输入保险 / TVS</span>
+  <span class="chip in">滤波与 MOS</span>
+  <span class="chip in">充电 IC / ACOK</span>
+  <span class="chip in">电池 BMS</span>
+</div>
+
+<div class="pbar">
+  <div class="track"><div class="fill" id="fill"></div></div>
+  <span class="pnum" id="pnum">0 / 0</span>
+  <button class="btn" onclick="resetAll()">重置</button>
+  <button class="btn" onclick="window.print()">打印</button>
+</div>
+
+<section class="card">
+  <div class="sechead"><span class="num">1</span><h2>板内通路与可测节点</h2></div>
+  <p class="desc">这七个环节是串联的，任何一处接触电阻变大或瞬时开路，都会在系统侧表现为供电中断。下图标出六个测点：Δ 为跨接压差，V 为对地电压。</p>
+
+  <svg class="diagram" viewBox="0 0 880 205" role="img" xmlns="http://www.w3.org/2000/svg">
+    <title>DC 座之后的板内供电路径与测点</title>
+    <desc>六个串联环节，标注压差测点与对地电压测点。</desc>
+    <defs>
+      <marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M2 1L8 5L2 9" fill="none" stroke="#888780" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </marker>
+    </defs>
+
+    <rect x="20" y="64" width="118" height="52" rx="8" fill="#EAF2FA" stroke="#185FA5" stroke-width="0.5"/>
+    <text x="79" y="84" text-anchor="middle" font-size="13" font-weight="500" fill="#12456F" font-family="sans-serif">DC 座焊点</text>
+    <text x="79" y="102" text-anchor="middle" font-size="11.5" fill="#185FA5" font-family="sans-serif">引脚与焊盘</text>
+
+    <line x1="140" y1="90" x2="160" y2="90" stroke="#888780" stroke-width="1.5" marker-end="url(#ar)"/>
+    <text x="150" y="52" text-anchor="middle" font-size="11.5" fill="#B45309" font-family="sans-serif">Δ1</text>
+
+    <rect x="164" y="64" width="118" height="52" rx="8" fill="#FBF2E4" stroke="#B45309" stroke-width="0.5"/>
+    <text x="223" y="84" text-anchor="middle" font-size="13" font-weight="500" fill="#6B4415" font-family="sans-serif">输入保险</text>
+    <text x="223" y="102" text-anchor="middle" font-size="11.5" fill="#B45309" font-family="sans-serif">贴片 Fuse / TVS</text>
+
+    <line x1="284" y1="90" x2="304" y2="90" stroke="#888780" stroke-width="1.5" marker-end="url(#ar)"/>
+    <text x="294" y="52" text-anchor="middle" font-size="11.5" fill="#B45309" font-family="sans-serif">Δ2</text>
+
+    <rect x="308" y="64" width="118" height="52" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text x="367" y="84" text-anchor="middle" font-size="13" font-weight="500" fill="#2C2C2A" font-family="sans-serif">输入滤波</text>
+    <text x="367" y="102" text-anchor="middle" font-size="11.5" fill="#5F5E5A" font-family="sans-serif">电感与 bulk 电容</text>
+
+    <line x1="428" y1="90" x2="448" y2="90" stroke="#888780" stroke-width="1.5" marker-end="url(#ar)"/>
+    <text x="438" y="52" text-anchor="middle" font-size="11.5" fill="#B45309" font-family="sans-serif">Δ3</text>
+
+    <rect x="452" y="64" width="118" height="52" rx="8" fill="#FBF2E4" stroke="#B45309" stroke-width="0.5"/>
+    <text x="511" y="84" text-anchor="middle" font-size="13" font-weight="500" fill="#6B4415" font-family="sans-serif">背靠背 MOS</text>
+    <text x="511" y="102" text-anchor="middle" font-size="11.5" fill="#B45309" font-family="sans-serif">电源路径切换</text>
+
+    <line x1="572" y1="90" x2="592" y2="90" stroke="#888780" stroke-width="1.5" marker-end="url(#ar)"/>
+    <text x="582" y="52" text-anchor="middle" font-size="11.5" fill="#B45309" font-family="sans-serif">Δ4</text>
+
+    <rect x="596" y="64" width="118" height="52" rx="8" fill="#EAF2FA" stroke="#185FA5" stroke-width="0.5"/>
+    <text x="655" y="84" text-anchor="middle" font-size="13" font-weight="500" fill="#12456F" font-family="sans-serif">充电 IC</text>
+    <text x="655" y="102" text-anchor="middle" font-size="11.5" fill="#185FA5" font-family="sans-serif">ACOK / ACDET</text>
+
+    <line x1="716" y1="90" x2="736" y2="90" stroke="#888780" stroke-width="1.5" marker-end="url(#ar)"/>
+    <text x="726" y="52" text-anchor="middle" font-size="11.5" fill="#B45309" font-family="sans-serif">Δ5</text>
+
+    <rect x="740" y="64" width="118" height="52" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text x="799" y="84" text-anchor="middle" font-size="13" font-weight="500" fill="#2C2C2A" font-family="sans-serif">系统轨 / 电池</text>
+    <text x="799" y="102" text-anchor="middle" font-size="11.5" fill="#5F5E5A" font-family="sans-serif">主供电与 BMS</text>
+
+    <circle cx="79" cy="140" r="9" fill="#fff" stroke="#185FA5" stroke-width="1"/>
+    <text x="79" y="144" text-anchor="middle" font-size="11" fill="#185FA5" font-family="sans-serif">V1</text>
+    <circle cx="223" cy="140" r="9" fill="#fff" stroke="#185FA5" stroke-width="1"/>
+    <text x="223" y="144" text-anchor="middle" font-size="11" fill="#185FA5" font-family="sans-serif">V2</text>
+    <circle cx="367" cy="140" r="9" fill="#fff" stroke="#185FA5" stroke-width="1"/>
+    <text x="367" y="144" text-anchor="middle" font-size="11" fill="#185FA5" font-family="sans-serif">V3</text>
+    <circle cx="511" cy="140" r="9" fill="#fff" stroke="#185FA5" stroke-width="1"/>
+    <text x="511" y="144" text-anchor="middle" font-size="11" fill="#185FA5" font-family="sans-serif">V4</text>
+    <circle cx="655" cy="140" r="9" fill="#fff" stroke="#185FA5" stroke-width="1"/>
+    <text x="655" y="144" text-anchor="middle" font-size="11" fill="#185FA5" font-family="sans-serif">V5</text>
+    <circle cx="799" cy="140" r="9" fill="#fff" stroke="#185FA5" stroke-width="1"/>
+    <text x="799" y="144" text-anchor="middle" font-size="11" fill="#185FA5" font-family="sans-serif">V6</text>
+
+    <text x="20" y="178" font-size="11.5" fill="#6E6E68" font-family="sans-serif">Δ 压差测点：万用表直流档跨接在元件两端，看负载下的压降</text>
+    <text x="20" y="195" font-size="11.5" fill="#6E6E68" font-family="sans-serif">V 对地测点：黑表笔接主板地，红表笔接节点，看绝对值与瞬时跌落</text>
+  </svg>
+
+  <div class="note blue">
+    <b>先说方法论。</b>这条链路上有两类故障，表现完全一样但位置差很远：<b>功率通路断了</b>（焊点、保险、MOS）和<b>检测回路误判</b>（ACOK 分压、充电 IC）。区分它们只需要两个表笔——同时盯着 <b>V1（输入电压）</b> 和 <b>ACOK 电平</b>：中断瞬间如果 V1 塌了，是功率通路；如果 V1 稳如磐石而 ACOK 掉了，是检测回路。这一刀切下去，后面就不用乱猜了。
+  </div>
+</section>
+
+<section class="card">
+  <div class="sechead"><span class="num">2</span><h2>第 0 步：确认中断发生在哪一层</h2></div>
+  <p class="desc">不拆机也能做，用来给后面的测量定方向。</p>
+
+  <div class="item" data-id="s2-1">
+    <label class="row"><input type="checkbox"><span class="t">判断是功率中断还是检测误判<span class="tag">前置</span></span></label>
+    <div class="body">
+      <p>中断发生时盯三样：屏幕是否黑、风扇是否停、外接鼠标灯是否灭。三样全断 → <b>功率通路</b>（Δ1–Δ3 区间）；三样都正常只是图标闪 → <b>检测回路</b>（ACOK / 充电 IC）。这个结论决定后面优先测哪一段。</p>
+      <p>如果是功率中断但机器没死，说明电池顶住了，此时电池连接器也在嫌疑范围内——因为那一瞬间是它在承担全部电流。</p>
+    </div>
+  </div>
+
+  <div class="item" data-id="s2-2">
+    <label class="row"><input type="checkbox"><span class="t">挂上电源事件监听，拿到时间戳底账</span></label>
+    <div class="body">
+      <p>管理员 PowerShell，每 200ms 采样一次，只在变化时写日志到桌面 <b>ac_watch.txt</b>。</p>
+      <pre><button class="copy">复制</button>$log = "$env:USERPROFILE\Desktop\ac_watch.txt"
+$last = $null
+while ($true) {
+  $b = Get-CimInstance Win32_Battery
+  $s = "$($b.BatteryStatus)|$($b.EstimatedChargeRemaining)"
+  if ($s -ne $last) {
+    "{0}  status={1}  batt={2}%" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff"), $b.BatteryStatus, $b.EstimatedChargeRemaining | Add-Content $log
+    $last = $s
+  }
+  Start-Sleep -Milliseconds 200
+}</pre>
+      <p><code>BatteryStatus</code> 为 1 表示放电，2 / 3 / 6 / 7 表示挂在交流上。看到 2→1→2 的来回跳，就是 AC 检测在抖。</p>
+    </div>
+  </div>
+
+  <div class="item" data-id="s2-3">
+    <label class="row"><input type="checkbox"><span class="t">检查电池能否兜底：容量与内阻</span></label>
+    <div class="body">
+      <pre><button class="copy">复制</button>powercfg /batteryreport /output "$env:USERPROFILE\Desktop\battery.html"</pre>
+      <p>满充容量低于设计容量 70% 时，电池在切换瞬间的输出电压会塌陷，本来一次正常的切换会被放大成整机掉电。这一项决定后面要不要把电池连接器列为主嫌。</p>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <div class="sechead"><span class="num">3</span><h2>第 1 步：不拆机的定向触发</h2></div>
+  <p class="desc">在监听窗口开着的情况下做。<b>能复现比能测量更重要</b>——复现不了，万用表夹上去也是白等。</p>
+
+  <div class="item" data-id="s3-1">
+    <label class="row"><input type="checkbox"><span class="t">T1 · 外壳形变：按压 C 面与 D 面</span></label>
+    <div class="body"><p>合盖再打开；单手抬机身一角使底壳轻微形变；在键盘右侧和转轴附近用指腹缓慢加力。目的是让主板产生微米级弯曲。<b>能复现 → 焊点类故障</b>（DC 座引脚、保险端帽、MOS 引脚），属于板级虚焊，热风枪补焊即可解决。</p></div>
+  </div>
+
+  <div class="item" data-id="s3-2">
+    <label class="row"><input type="checkbox"><span class="t">T2 · 轻敲定位：底壳分区敲击</span></label>
+    <div class="body"><p>用指关节轻敲底壳的不同区域，每次一个区域，间隔 30 秒：左后（DC 座附近）、中部（充电 IC 与 MOS 区）、右下（电池接口区）。<b>敲到某个区域才复现 → 该区域有虚焊或连接器接触不良</b>，直接把范围缩到几平方厘米。</p></div>
+  </div>
+
+  <div class="item" data-id="s3-3">
+    <label class="row"><input type="checkbox"><span class="t">T3 · 负载阶梯：观察中断频率与功率的关系</span></label>
+    <div class="body"><p>Fn+Q 依次切到安静 / 均衡 / 野兽，每档跑 15 分钟，记录每档的中断次数。<b>频率随功率上升 → 串联电阻型故障</b>（保险端帽微裂、焊点氧化、MOS 导通电阻升高），因为压降随电流线性放大。频率与功率无关 → 更偏检测回路或 BMS。</p></div>
+  </div>
+</section>
+
+<section class="card">
+  <div class="sechead"><span class="num">4</span><h2>第 2 步：开盖后的压差测量</h2></div>
+  <p class="desc">到这一步才需要工具。核心原则：<b>不猜绝对电压，只看同一元件两端的压差</b>。压差法对接触电阻最敏感，也不受具体机型电压设计的影响。</p>
+
+  <div class="note red">
+    <b>安全前置。</b>通电测量有短路和触电风险，以下几条不是建议是必须：断开适配器再拆后盖；拆完先摸一下金属机箱放静电；测量时只用<b>单手</b>持表笔，另一只手不要碰机身；表笔尖必须细（推荐针式探头），落点前先确认不会同时碰到相邻焊盘；探头用胶带临时固定后再通电，不要边通电边找位置；<b>绝对不要在通电状态下插拔任何排线</b>。若机器在保，直接跳到第 5 节，不要自己动手。
+  </div>
+
+  <dl class="spec">
+    <dt>工具</dt><dd>数字万用表（需带 <b>MAX/MIN 记录</b> 功能，否则抓不到毫秒级瞬断）</dd>
+    <dt>档位</dt><dd>直流电压档，20V 或自动量程</dd>
+    <dt>接地</dt><dd>黑表笔固定在主板螺丝孔金属环或电池负极焊盘</dd>
+    <dt>关键</dt><dd>必须先让故障<b>处于可复现状态</b>，静态测一遍毫无意义</dd>
+  </dl>
+
+  <div class="item" data-id="s4-1">
+    <label class="row"><input type="checkbox"><span class="t">M1 · Δ1：DC 座引脚到保险输入端</span></label>
+    <div class="body">
+      <dl class="spec">
+        <dt>测法</dt><dd>红表笔点 DC 座正极引脚焊盘，黑表笔点保险输入端，读压差</dd>
+        <dt>正常</dt><dd>空载 &lt; 30mV，满载 &lt; 100mV</dd>
+        <dt>异常</dt><dd>满载超过 200mV，或 MAX 记录到几伏的瞬时跳变</dd>
+        <dt>含义</dt><dd><b>座子引脚虚焊或焊盘环状裂纹</b>。这是外形形变（T1）能触发的那一类，补焊即可</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="item" data-id="s4-2">
+    <label class="row"><input type="checkbox"><span class="t">M2 · Δ2：输入保险两端<span class="tag">重点</span></span></label>
+    <div class="body">
+      <dl class="spec">
+        <dt>测法</dt><dd>表笔跨接保险两端（贴片保险通常丝印 F 或 PF，靠近 DC 座）</dd>
+        <dt>正常</dt><dd>空载 &lt; 20mV，满载 &lt; 80mV</dd>
+        <dt>异常</dt><dd>压差随负载明显上升，或 MAX 值跳到 1V 以上</dd>
+        <dt>含义</dt><dd><b>熔丝微裂或端帽虚焊</b>。这类故障的典型特征就是"偶发、一秒钟、与负载相关"——熔丝在电流脉冲下热胀微开，冷却后重新接通，肉眼和静态通断测试都查不出来</dd>
+      </dl>
+      <div class="note">这一项是本次症状最匹配的候选之一。贴片保险的失效往往不是彻底烧断，而是端帽与陶瓷体之间的焊层出现微裂纹，表现为一个随温度、电流变化的可变电阻。</div>
+    </div>
+  </div>
+
+  <div class="item" data-id="s4-3">
+    <label class="row"><input type="checkbox"><span class="t">M3 · Δ3：背靠背 MOS 的漏源压差</span></label>
+    <div class="body">
+      <dl class="spec">
+        <dt>测法</dt><dd>跨接在电源路径 MOS 的 D-S 之间（通常是 DC 座与充电 IC 之间的两颗并排 MOS）</dd>
+        <dt>正常</dt><dd>导通时 &lt; 100mV</dd>
+        <dt>异常</dt><dd>压差异常大，或中断瞬间跳到数伏</dd>
+        <dt>含义</dt><dd><b>MOS 导通电阻退化或栅极驱动异常</b>。栅极电压不足会让 MOS 工作在放大区，压降随电流急剧上升，触发后级欠压保护</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="item" data-id="s4-4">
+    <label class="row"><input type="checkbox"><span class="t">M4 · V5：ACOK / ACDET 引脚电平<span class="tag">重点</span></span></label>
+    <div class="body">
+      <dl class="spec">
+        <dt>测法</dt><dd>找到充电 IC 的 ACOK（或 ACDET）引脚，对地测电压，同时用 MAX/MIN 模式长期记录</dd>
+        <dt>正常</dt><dd>稳定停在阈值之上，全程无跳变</dd>
+        <dt>异常</dt><dd>在阈值附近游走，或出现掉到 0 的瞬时脉冲</dd>
+        <dt>含义</dt><dd><b>ACDET 分压电阻虚焊或阻值漂移</b>。检测脚电压在阈值边缘抖动时，EC 每抖一次就报一次"拔插"，而充电 IC 的去抖时间正好是几百毫秒到一秒</dd>
+      </dl>
+      <div class="note blue">把 M1 的 V1 和这一项同时测：<b>V1 掉了 → 功率通路；V1 不动而 ACOK 掉了 → 检测回路</b>。这一个对照就能把七段链路砍成两半。分压电阻通常是两颗高阻值贴片电阻，一端接输入电压，一端接地，中间抽头进 IC——虚焊多发生在抽头那一侧。</div>
+    </div>
+  </div>
+
+  <div class="item" data-id="s4-5">
+    <label class="row"><input type="checkbox"><span class="t">M5 · 电池连接器与主轨</span></label>
+    <div class="body">
+      <dl class="spec">
+        <dt>测法</dt><dd>测电池连接器两端的压差，以及系统主轨在中断瞬间的跌落幅度</dd>
+        <dt>异常</dt><dd>切换瞬间主轨跌到后级欠压阈值以下</dd>
+        <dt>含义</dt><dd><b>电池排线接触电阻过大或 BMS 保护跳变</b>。AC 掉线那一瞬全部电流由电池承担，接触不良就会把一次正常的电源切换放大成整机掉电</dd>
+      </dl>
+      <p>如果 M1–M4 全部正常而故障依旧，这一项就是最后的嫌疑。把电池排线重新插拔一次、清洁触点，观察 48 小时。</p>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <div class="sechead"><span class="num">5</span><h2>判定矩阵</h2></div>
+  <p class="desc">测量结果对到下表，直接得出要动哪个元件。</p>
+
+  <table>
+    <thead><tr><th style="width:34%">测量结果</th><th style="width:30%">故障点</th><th>处置</th></tr></thead>
+    <tbody>
+      <tr><td>Δ1 满载压差 &gt; 200mV，或形变可复现</td><td><b>DC 座引脚 / 焊盘裂纹</b></td><td>补焊或更换 DC 座组件</td></tr>
+      <tr><td>Δ2 随负载上升，MAX 记录到伏级跳变</td><td><span class="w">输入保险微裂</span></td><td>更换同规格贴片保险，顺带查后级有无短路隐患</td></tr>
+      <tr><td>Δ3 压差异常，中断时跳数伏</td><td><b>电源路径 MOS 退化</b></td><td>更换 MOS 及栅极驱动电阻</td></tr>
+      <tr><td>V1 稳定但 ACOK 掉脉冲</td><td><span class="w">ACDET 分压 / 充电 IC</span></td><td>补焊分压电阻；仍异常则换充电 IC</td></tr>
+      <tr><td>V1 与 ACOK 同时掉</td><td><b>功率通路断开，上游</b></td><td>回到 Δ1–Δ3 逐段缩小</td></tr>
+      <tr><td>主轨跌落但前级全正常</td><td><b>电池连接器 / BMS</b></td><td>清洁触点、换排线，必要时换电池</td></tr>
+      <tr><td>所有压差正常且无法复现</td><td>固件层误判</td><td>刷 BIOS/EC；卸载写 EC 的第三方工具后观察一周</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="card">
+  <div class="sechead"><span class="num">6</span><h2>送修时要说的话</h2></div>
+  <p class="desc">板级偶发故障最怕被判定"无故障退回"。与其描述症状，不如直接给测量要求和判据。</p>
+
+  <div class="item" data-id="s6-1">
+    <label class="row"><input type="checkbox"><span class="t">给工程师的明确要求</span></label>
+    <div class="body">
+      <div class="note" style="margin:0">
+        "机器在纯交流供电下无规律出现 1 秒左右的供电中断，适配器与线缆已更换、插座已更换，问题依旧，范围已排除到机身内部。请做以下检测：<b>① DC 座引脚与焊盘的负载压差；② 输入保险两端压差（重点，怀疑熔丝微裂或端帽虚焊）；③ 电源路径 MOS 的 D-S 压降；④ 充电 IC 的 ACOK / ACDET 引脚电平是否有瞬时跌落；⑤ 电池连接器接触电阻。</b>建议用带 MAX/MIN 记录的万用表做动态测量，静态通断测试查不出这类故障。"
+      </div>
+      <p style="margin-top:10px">附上 <b>ac_watch.txt</b> 里的时间戳、以及故障发生时拍的视频。有客观时间点，对方就不好用"没测出来"推回来。</p>
+    </div>
+  </div>
+
+  <div class="item" data-id="s6-2">
+    <label class="row"><input type="checkbox"><span class="t">备件与费用预期</span></label>
+    <div class="body">
+      <p>按可能性从高到低，需要准备的件是：<b>输入保险</b>（几毛钱，但工时占大头）、<b>DC 座组件</b>、<b>电源路径 MOS</b>、<b>充电 IC</b>。前两项属于常规板级维修，第三、四项需要 BGA 或 QFN 返修能力，报价会明显上一个台阶。如果检测下来指向主板多点为虚焊，换整块主板的性价比可能更高。</p>
+      <p>送修前先在官网用 SN 查整机与电池各自的保修期，备份数据并退出账号，取机时核对工单上写明的更换部件。</p>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <div class="sechead"><span class="num">7</span><h2>故障记录表</h2></div>
+  <p class="desc">每次中断补一行。三天后回头看，尤其是"当时动作"和"负载"两列的规律。</p>
+
+  <div class="logbar">
+    <button class="btn" onclick="addRow()">＋ 添加一行</button>
+    <button class="btn" onclick="exportCsv()">导出 CSV</button>
+    <button class="btn" onclick="clearLog()">清空</button>
+  </div>
+
+  <table id="logtable">
+    <thead>
+      <tr>
+        <th style="width:15%">时间</th>
+        <th style="width:15%">表现</th>
+        <th style="width:29%">当时动作</th>
+        <th style="width:13%">负载</th>
+        <th style="width:20%">日志跳变</th>
+        <th style="width:8%"></th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <p style="font-size:12.3px;color:var(--mut);margin-top:6px">记录保存在本机浏览器，关掉页面不会丢。</p>
+</section>
+
+<footer>
+  串联通路排查的基本功：用一个能分辨毫秒的仪表，把"断了"翻译成"哪一段断了"。<br>
+  压差法之所以可靠，是因为它不依赖任何机型的具体电压设计。
+</footer>
+
+</div>
+
+<script>
+(function(){
+  var KEY='y9000p_board_v2';
+  var state=JSON.parse(localStorage.getItem(KEY)||'{}');
+  var boxes=document.querySelectorAll('.row input');
+  var fill=document.getElementById('fill'), pnum=document.getElementById('pnum');
+
+  function update(){
+    var n=0;
+    boxes.forEach(function(b){ if(b.checked) n++; });
+    fill.style.width=(n/boxes.length*100)+'%';
+    pnum.textContent=n+' / '+boxes.length;
+    boxes.forEach(function(b){ b.closest('.row').classList.toggle('done', b.checked); });
+  }
+
+  boxes.forEach(function(b){
+    var item=b.closest('.item');
+    var id=item?item.dataset.id:'';
+    if(state[id]) b.checked=true;
+    b.addEventListener('change',function(){
+      if(id){ state[id]=b.checked; localStorage.setItem(KEY,JSON.stringify(state)); }
+      update();
+    });
+  });
+
+  document.querySelectorAll('.copy').forEach(function(btn){
+    btn.addEventListener('click',function(e){
+      e.preventDefault();
+      var pre=btn.parentNode;
+      var text=pre.innerText.replace(/^复制\s*/,'');
+      navigator.clipboard.writeText(text).then(function(){
+        btn.textContent='已复制';
+        setTimeout(function(){btn.textContent='复制';},1400);
+      }).catch(function(){
+        var r=document.createRange(); r.selectNodeContents(pre);
+        var s=getSelection(); s.removeAllRanges(); s.addRange(r);
+        btn.textContent='请按 Ctrl+C';
+      });
+    });
+  });
+
+  var tbody=document.querySelector('#logtable tbody');
+  var LOGKEY='y9000p_board_log_v2';
+
+  function saveRows(){
+    var data=[];
+    tbody.querySelectorAll('tr').forEach(function(tr){
+      data.push({
+        t:tr.querySelector('.c1').value, k:tr.querySelector('.c2').value,
+        a:tr.querySelector('.c3').value, l:tr.querySelector('.c4').value,
+        j:tr.querySelector('.c5').value
+      });
+    });
+    localStorage.setItem(LOGKEY,JSON.stringify(data));
+  }
+
+  function makeRow(d){
+    d=d||{};
+    var tr=document.createElement('tr');
+    tr.innerHTML=
+      '<td><input class="c1" type="text" placeholder="11-06 21:30" value="'+(d.t||'')+'"></td>'+
+      '<td><select class="c2">'+
+        '<option>功率中断 黑屏</option>'+
+        '<option>检测误判 仅闪</option>'+
+        '<option>不确定</option>'+
+      '</select></td>'+
+      '<td><input class="c3" type="text" placeholder="例：抬机身一角" value="'+(d.a||'')+'"></td>'+
+      '<td><select class="c4"><option>空载</option><option>办公</option><option>游戏/满载</option></select></td>'+
+      '<td><select class="c5"><option>是 2→1→2</option><option>否</option><option>未开监听</option></select></td>'+
+      '<td><button class="del" title="删除">×</button></td>';
+    tbody.appendChild(tr);
+    if(d.k) tr.querySelector('.c2').value=d.k;
+    if(d.l) tr.querySelector('.c4').value=d.l;
+    if(d.j) tr.querySelector('.c5').value=d.j;
+    tr.querySelectorAll('input,select').forEach(function(el){ el.addEventListener('change',saveRows); });
+    tr.querySelector('.del').addEventListener('click',function(){ tr.remove(); saveRows(); });
+  }
+
+  var saved=JSON.parse(localStorage.getItem(LOGKEY)||'[]');
+  if(saved.length){ saved.forEach(makeRow); } else { makeRow(); makeRow(); makeRow(); }
+
+  window.addRow=function(){ makeRow(); saveRows(); };
+  window.clearLog=function(){
+    if(!confirm('清空所有记录？')) return;
+    tbody.innerHTML=''; localStorage.removeItem(LOGKEY); makeRow();
+  };
+  window.exportCsv=function(){
+    var esc=function(s){ return '"'+String(s||'').replace(/"/g,'""')+'"'; };
+    var lines=[['时间','表现','当时动作','负载','日志跳变'].map(esc).join(',')];
+    tbody.querySelectorAll('tr').forEach(function(tr){
+      lines.push([
+        tr.querySelector('.c1').value, tr.querySelector('.c2').value,
+        tr.querySelector('.c3').value, tr.querySelector('.c4').value,
+        tr.querySelector('.c5').value
+      ].map(esc).join(','));
+    });
+    var blob=new Blob(['\uFEFF'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'});
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='Y9000P_board_log.csv';
+    a.click(); URL.revokeObjectURL(a.href);
+  };
+  window.resetAll=function(){
+    if(!confirm('重置所有勾选状态？')) return;
+    localStorage.removeItem(KEY); state={};
+    boxes.forEach(function(b){ b.checked=false; });
+    update();
+  };
+
+  update();
+})();
+</script>
+</body>
+</html>
